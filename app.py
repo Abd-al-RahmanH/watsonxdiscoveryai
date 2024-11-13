@@ -1,19 +1,12 @@
 import os
 import streamlit as st
-import tempfile
-import json
-import pandas as pd
 from ibm_watson import DiscoveryV2
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 from ibm_watson_machine_learning.foundation_models import Model
 from ibm_watson_machine_learning.metanames import GenTextParamsMetaNames as GenParams
 from ibm_watson_machine_learning.foundation_models.utils.enums import DecodingMethods
-from langchain.chains import RetrievalQA
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.prompts import PromptTemplate
 
-# Watson Discovery and Watsonx API Setup
+# Watson Discovery Setup
 authenticator = IAMAuthenticator('5sSmoI6y0ZHP7D3a6Iu80neypsbK3tsUZR_VdRAb7ed2')
 discovery = DiscoveryV2(
     version='2020-08-30',
@@ -25,11 +18,6 @@ discovery.set_service_url('https://api.us-south.discovery.watson.cloud.ibm.com/i
 url = "https://us-south.ml.cloud.ibm.com"
 api_key = "zf-5qgRvW-_RMBGb0bQw5JPPGGj5wdYpLVypdjQxBGJz"
 watsonx_project_id = "32a4b026-a46a-48df-aae3-31e16caabc3b"
-model_type = "meta-llama/llama-3-1-70b-instruct"
-max_tokens = 100
-min_tokens = 50
-decoding = DecodingMethods.GREEDY
-temperature = 0.7
 
 # Function to get Watsonx model
 def get_model(model_type, max_tokens, min_tokens, decoding, temperature):
@@ -48,88 +36,68 @@ def get_model(model_type, max_tokens, min_tokens, decoding, temperature):
     return model
 
 # Streamlit UI Setup
-st.title("Watsonx AI and Discovery Integration")
-st.write("Ask questions and get responses using Watson Discovery and Watsonx AI models.")
+st.title("Talk to Watsonx LLM or Discovery")
+st.write("Ask questions and get responses from either Watson Discovery or Watsonx LLM.")
 
 # Sidebar Settings
 with st.sidebar:
     st.title("Watsonx Settings")
-    model_name = st.selectbox("Choose Model", ["meta-llama/llama-3-1-70b-instruct", "codellama/codellama-34b-instruct-hf", "ibm/granite-20b-multilingual"])
+    model_name = st.selectbox("Choose LLM Model", ["meta-llama/llama-3-1-70b-instruct", "codellama/codellama-34b-instruct-hf", "ibm/granite-20b-multilingual"])
     max_new_tokens = st.slider("Max output tokens", min_value=100, max_value=4000, value=600, step=100)
     decoding_method = st.radio("Decoding Method", [DecodingMethods.GREEDY.value, DecodingMethods.SAMPLE.value])
     temperature = st.slider("Temperature", min_value=0.0, max_value=1.0, value=0.7)
+    interaction_choice = st.radio("Select Query Source", ("Watson Discovery", "Talk to LLM"))
 
-# File upload section
-uploaded_file = st.file_uploader("Upload a file for RAG", type=["pdf", "docx", "txt", "pptx", "csv", "json", "xml", "yaml", "html"])
+# Input text for the question
+question = st.text_input("Ask your question:")
 
-# Load Watson Discovery Documents
-if uploaded_file:
-    st.write(f"File uploaded: {uploaded_file.name}")
-    
-    # You can implement your custom file loaders or use Langchain to load documents here
-    # For simplicity, let's assume we're querying Watson Discovery for the file content
-    
-    question = st.text_input("Enter your question:")
-    
-    if question:
-        # Query Watson Discovery
-        response = discovery.query(
-            project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',
-            collection_ids=['1d91d603-cd71-5cf5-0000-019325bcd328'],
-            passages={'enabled': True, 'max_per_document': 5, 'find_answers': True},
-            natural_language_query=question
-        ).get_result()
-        
-        # Extract document names from Watson Discovery response
-        doc_names = [doc['id'] for doc in response['results']]
-        st.write("Documents Retrieved from Watson Discovery:")
-        st.write(doc_names)
+# Button to trigger the query
+if st.button("Ask"):
+    if interaction_choice == "Watson Discovery":
+        # Query Watson Discovery for the document content based on the question
+        if question:
+            response = discovery.query(
+                project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',
+                collection_ids=['1d91d603-cd71-5cf5-0000-019325bcd328'],
+                passages={'enabled': True, 'max_per_document': 5, 'find_answers': True},
+                natural_language_query=question
+            ).get_result()
 
-        # Process the Discovery results
-        passages = response['results'][0]['document_passages']
-        passages = [p['passage_text'].replace('<em>', '').replace('</em>', '').replace('\n', '') for p in passages]
-        context = '\n '.join(passages)
-        
-        # Generate the response using Watsonx AI model
-        prompt = (
-            "<s>[INST] <<SYS>> "
-            "Please answer the following question in one sentence using this text. "
-            "If the question is unanswerable, say 'unanswerable'. "
-            "If you responded to the question, don't say 'unanswerable'. "
-            "Do not include information that's not relevant to the question. "
-            "Do not answer other questions. "
-            "Make sure the language used is English.'"
-            "Do not use repetitions' "
-            "Question:" + question + 
-            '<</SYS>>' + context + '[/INST]'
-        )
-        
-        # Get the model and generate the answer
-        model = get_model(model_name, max_new_tokens, min_tokens, decoding_method, temperature)
-        generated_response = model.generate(prompt)
-        response_text = generated_response['results'][0]['generated_text']
-        
-        # Display the answer
-        st.subheader("Generated Answer:")
-        st.write(response_text)
+            # Extract document names and passages from the response
+            doc_names = [doc['id'] for doc in response['results']]
+            passages = response['results'][0]['document_passages']
+            context = '\n '.join([p['passage_text'].replace('<em>', '').replace('</em>', '').replace('\n', '') for p in passages])
 
-# Conversation history
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+            st.write("Documents Retrieved from Watson Discovery:")
+            st.write(doc_names)
 
-for message in st.session_state.messages:
-    st.chat_message(message["role"]).markdown(message["content"])
+            # Display the answer based on Watson Discovery
+            st.subheader("Answer from Watson Discovery:")
+            st.write(context)
 
-# Chat loop
-prompt = st.chat_input("Ask your question:")
+    elif interaction_choice == "Talk to LLM":
+        # Query Watsonx LLM for the generated response
+        if question:
+            model = get_model(model_name, max_new_tokens, 50, decoding_method, temperature)
+            prompt = (
+                "<s>[INST] <<SYS>> "
+                "Please answer the following question in one sentence using this text. "
+                "If the question is unanswerable, say 'unanswerable'. "
+                "If you responded to the question, don't say 'unanswerable'. "
+                "Do not include information that's not relevant to the question. "
+                "Do not answer other questions. "
+                "Make sure the language used is English.'"
+                "Do not use repetitions' "
+                "Question:" + question + 
+                '<</SYS>>' + "Please answer this question." + '[/INST]'
+            )
+            
+            generated_response = model.generate(prompt)
+            response_text = generated_response['results'][0]['generated_text']
 
-if prompt:
-    st.chat_message("user").markdown(prompt)
-    model = get_model(model_name, max_new_tokens, min_tokens, decoding_method, temperature)
-    generated_response = model.generate(prompt)
-    response_text = generated_response['results'][0]['generated_text']
-    
-    # Display the response and update conversation history
-    st.session_state.messages.append({'role': 'user', 'content': prompt})
-    st.chat_message("assistant").markdown(response_text)
-    st.session_state.messages.append({'role': 'assistant', 'content': response_text})
+            st.subheader("Answer from Watsonx LLM:")
+            st.write(response_text)
+
+# Add some footer for UX improvement
+st.write("---")
+st.write("This app is powered by IBM Watsonx and Watson Discovery.")
