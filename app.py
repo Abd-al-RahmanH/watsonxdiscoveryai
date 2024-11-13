@@ -63,22 +63,27 @@ if st.button("Ask"):
                 natural_language_query=question
             ).get_result()
 
-            # Inspecting the response structure to understand the key names
-            st.write("Raw Watson Discovery Response:")
-            st.json(response)  # This will help you inspect the structure
-
-            # Now extracting documents and passages correctly
+            # Extract relevant passages and clean up the response
             if "results" in response:
                 results = response["results"]
-                # Extract document titles (or ids) and passages
                 doc_titles = [result.get('title', 'No Title') for result in results]
                 passages = results[0].get('document_passages', [])
-                context = '\n '.join([p.get('passage_text', '').replace('<em>', '').replace('</em>', '').replace('\n', '') for p in passages])
+                
+                # Clean up passages by removing unwanted text like page numbers
+                cleaned_passages = []
+                for p in passages:
+                    passage_text = p.get('passage_text', '').replace('<em>', '').replace('</em>', '').replace('\n', '')
+                    # Remove page numbers and irrelevant formatting
+                    cleaned_text = ' '.join([word for word in passage_text.split() if not word.startswith("P") and not word.startswith("page")])
+                    cleaned_passages.append(cleaned_text)
 
+                # Join cleaned passages into a readable format
+                context = '\n '.join(cleaned_passages)
+
+                # Display documents and the cleaned answer
                 st.write("Documents Retrieved from Watson Discovery:")
                 st.write(doc_titles)
 
-                # Display the answer based on Watson Discovery
                 st.subheader("Answer from Watson Discovery:")
                 st.write(context)
 
