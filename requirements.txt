@@ -4,3 +4,4 @@ ibm-cloud-sdk-core
 ibm-watson-machine-learning
 langchain
 huggingface_hub
+langchain-community
