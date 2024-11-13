@@ -63,17 +63,24 @@ if st.button("Ask"):
                 natural_language_query=question
             ).get_result()
 
-            # Extract document names and passages from the response
-            doc_names = [doc['id'] for doc in response['results']]
-            passages = response['results'][0]['document_passages']
-            context = '\n '.join([p['passage_text'].replace('<em>', '').replace('</em>', '').replace('\n', '') for p in passages])
+            # Inspecting the response structure to understand the key names
+            st.write("Raw Watson Discovery Response:")
+            st.json(response)  # This will help you inspect the structure
 
-            st.write("Documents Retrieved from Watson Discovery:")
-            st.write(doc_names)
+            # Now extracting documents and passages correctly
+            if "results" in response:
+                results = response["results"]
+                # Extract document titles (or ids) and passages
+                doc_titles = [result.get('title', 'No Title') for result in results]
+                passages = results[0].get('document_passages', [])
+                context = '\n '.join([p.get('passage_text', '').replace('<em>', '').replace('</em>', '').replace('\n', '') for p in passages])
 
-            # Display the answer based on Watson Discovery
-            st.subheader("Answer from Watson Discovery:")
-            st.write(context)
+                st.write("Documents Retrieved from Watson Discovery:")
+                st.write(doc_titles)
+
+                # Display the answer based on Watson Discovery
+                st.subheader("Answer from Watson Discovery:")
+                st.write(context)
 
     elif interaction_choice == "Talk to LLM":
         # Query Watsonx LLM for the generated response
