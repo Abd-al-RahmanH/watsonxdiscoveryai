@@ -4,9 +4,9 @@ from ibm_watson import DiscoveryV2
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 from ibm_watson_machine_learning.foundation_models import Model
 from ibm_watson_machine_learning.metanames import GenTextParamsMetaNames as GenParams
-from ibm_watson_machine_learning.foundation_models.utils.enums import DecodingMethods
+from ibm_watson_machine_learning.foundation_models.utils.enums import ModelTypes, DecodingMethods
 
-# Hardcoded IBM Watson Discovery and Watsonx Credentials
+# IBM Watson Discovery and Watsonx Credentials (replace with your keys)
 authenticator = IAMAuthenticator('5sSmoI6y0ZHP7D3a6Iu80neypsbK3tsUZR_VdRAb7ed2')
 discovery = DiscoveryV2(
     version='2020-08-30',
@@ -14,15 +14,34 @@ discovery = DiscoveryV2(
 )
 discovery.set_service_url('https://api.us-south.discovery.watson.cloud.ibm.com/instances/62dc0387-6c6f-4128-b479-00cf5dea09ef')
 
-# Watsonx API Setup
+# Watsonx Model Setup
 url = "https://us-south.ml.cloud.ibm.com"
 api_key = "zf-5qgRvW-_RMBGb0bQw5JPPGGj5wdYpLVypdjQxBGJz"
 watsonx_project_id = "32a4b026-a46a-48df-aae3-31e16caabc3b"
 model_type = "meta-llama/llama-3-1-70b-instruct"
-max_tokens = 4000  # Hardcoded as requested
-min_tokens = 50
-decoding = DecodingMethods.GREEDY
-temperature = 0.7  # Hardcoded as requested
+
+# Streamlit UI setup
+st.set_page_config(page_title="Watsonx AI and Discovery Integration", layout="wide")
+st.title("Watsonx AI and Discovery Integration")
+
+# Sidebar for Model Parameters
+st.sidebar.header("Watsonx Model Settings")
+max_tokens = st.sidebar.slider("Max Tokens", 50, 200, 100)
+min_tokens = st.sidebar.slider("Min Tokens", 0, 50, 50)
+decoding = st.sidebar.selectbox("Decoding Method", [DecodingMethods.GREEDY, DecodingMethods.SAMPLE])
+temperature = st.sidebar.slider("Temperature", 0.0, 1.0, 0.7)
+
+# Clear Messages button in Sidebar
+if st.sidebar.button("Clear Messages"):
+    st.session_state.history = []
+
+# Display History in Sidebar
+st.sidebar.header("Chat History")
+if "history" not in st.session_state:
+    st.session_state.history = []
+for i, (q, a) in enumerate(st.session_state.history):
+    st.sidebar.write(f"Q{i+1}: {q}")
+    st.sidebar.write(f"A{i+1}: {a}")
 
 # Define the model generator function
 def get_model(model_type, max_tokens, min_tokens, decoding, temperature):
@@ -40,57 +59,50 @@ def get_model(model_type, max_tokens, min_tokens, decoding, temperature):
     )
     return model
 
-# Streamlit UI setup
-st.title("Watsonx AI and Discovery Integration")
-st.write("Ask your question below to get an answer from Watson Discovery and Watsonx AI.")
+st.write("This app allows you to ask questions, which will be answered by a combination of Watson Discovery and Watsonx model.")
 
 # Input for the question
 question = st.text_input("Enter your question:")
 
 if st.button('Get Answer'):
     if question:
-        try:
-            # Query IBM Watson Discovery
-            response = discovery.query(
-                project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',
-                collection_ids=['1d91d603-cd71-5cf5-0000-019325bcd328'],
-                passages={'enabled': True, 'max_per_document': 5, 'find_answers': True},
-                natural_language_query=question
-            ).get_result()
+        # Query Watson Discovery
+        response = discovery.query(
+            project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',
+            collection_ids=['1d91d603-cd71-5cf5-0000-019325bcd328'],
+            passages={'enabled': True, 'max_per_document': 5, 'find_answers': True},
+            natural_language_query=question
+        ).get_result()
 
-            # Process the Discovery response
-            if response.get('results'):
-                passages = response['results'][0].get('document_passages', [])
-                # Extracting and formatting passages
-                passages = [
-                    p['passage_text'].replace('<em>', '').replace('</em>', '').replace('\n', '') 
-                    for p in passages
-                ]
-                context = ' '.join(passages)
+        # Process the Discovery response
+        passages = response['results'][0]['document_passages']
+        passages = [p['passage_text'].replace('<em>', '').replace('</em>', '').replace('\n', '') for p in passages]
+        context = '\n '.join(passages)
 
-                # Prepare prompt for Watsonx
-                prompt = (
-                    "<s>[INST] <<SYS>> "
-                    "Please answer the following question in one sentence using this text. "
-                    "If the question is unanswerable, say 'unanswerable'. "
-                    "Do not include irrelevant information. "
-                    "Question: " + question +
-                    " <</SYS>>" + context + " [/INST]"
-                )
+        # Prepare the prompt for Watsonx
+        prompt = (
+            "<s>[INST] <<SYS>> "
+            "Please answer the following question in one sentence using this text. "
+            "If the question is unanswerable, say 'unanswerable'. "
+            "If you responded to the question, don't say 'unanswerable'. "
+            "Do not include information that's not relevant to the question. "
+            "Do not answer other questions. "
+            "Make sure the language used is English.'"
+            "Do not use repetitions' "
+            "Question:" + question + 
+            '<</SYS>>' + context + '[/INST]'
+        )
 
-                # Generate response using Watsonx
-                model = get_model(model_type, max_tokens, min_tokens, decoding, temperature)
-                generated_response = model.generate(prompt)
-                response_text = generated_response['results'][0]['generated_text']
+        # Generate the answer using Watsonx
+        model = get_model(model_type, max_tokens, min_tokens, decoding, temperature)
+        generated_response = model.generate(prompt)
+        response_text = generated_response['results'][0]['generated_text']
 
-                # Display the answer
-                st.subheader("Generated Answer:")
-                st.write(response_text)
-            else:
-                st.write("No relevant results found in Discovery.")
+        # Display the generated response
+        st.subheader("Generated Answer:")
+        st.write(response_text)
 
-        except Exception as e:
-            st.error(f"An error occurred: {str(e)}")
-
+        # Add question and answer to history
+        st.session_state.history.append((question, response_text))
     else:
         st.error("Please enter a question!")
