@@ -63,16 +63,15 @@ if st.button('Get Answer'):
         context = '\n '.join(passages)
 
         # Prepare the prompt for Watsonx
-prompt = (
-    "<s>[INST] <<SYS>> "
-    "Please provide a detailed, step-by-step guide to answer the following question. "
-    "If the question is unanswerable, say 'unanswerable'. "
-    "Make sure each step is clearly explained. "
-    "Answer in English and avoid unnecessary repetition. "
-    "Question:" + question + 
-    '<</SYS>>' + context + '[/INST]'
-    )
-
+        prompt = (
+            "<s>[INST] <<SYS>> "
+            "Please provide a detailed, step-by-step guide to answer the following question. "
+            "If the question is unanswerable, say 'unanswerable'. "
+            "Make sure each step is clearly explained. "
+            "Answer in English and avoid unnecessary repetition. "
+            "Question:" + question + 
+            '<</SYS>>' + context + '[/INST]'
+        )
 
         # Generate the answer using Watsonx
         model = get_model(model_type, max_tokens, min_tokens, decoding, temperature)
