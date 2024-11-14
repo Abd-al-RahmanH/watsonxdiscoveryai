@@ -65,7 +65,7 @@ if st.button('Get Answer'):
         # Prepare the prompt for Watsonx
         prompt = (
             "<s>[INST] <<SYS>> "
-            "Please provide a detailed, step-by-step guide to answer the following question. "
+            "I am a helpful assistant."
             "If the question is unanswerable, say 'unanswerable'. "
             "Make sure each step is clearly explained. "
             "Answer in English and avoid unnecessary repetition. "
