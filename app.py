@@ -81,22 +81,26 @@ if prompt:
         response_text = response['results'][0]['generated_text']
 
     elif mode == "Watson Discovery":
+        # Query Watson Discovery
         query_response = discovery.query(
             project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',  # project_id from notebook
             collection_ids=['1d91d603-cd71-5cf5-0000-019325bcd328'],  # collection_id from notebook
             natural_language_query=prompt,
             count=1,
-            highlight=True  # Enable highlights to retrieve specific passages
+            highlight=True
         ).get_result()
         
-        # Check if there are any highlights in the results
-        if query_response['results'] and 'highlight' in query_response['results'][0]:
-            # Get the highlighted text from the response
-            highlights = query_response['results'][0]['highlight']['text']
-            # Join multiple highlights if present
-            response_text = "\n".join(highlights)
+        if query_response['results']:
+            # Extract highlighted text or main text
+            result_text = query_response['results'][0].get('highlight', {}).get('text', [""])[0] or query_response['results'][0]['text']
+            
+            # Use the LLM to summarize or refine Watson Discovery results
+            model = get_model(model_type, max_tokens, temperature)
+            prompt_text = f"<s>[INST] <<SYS>> Based on the following document content, please provide a concise answer to the question: {prompt} <<USER>> {result_text} <</USER>[/INST]"
+            response = model.generate(prompt_text)
+            response_text = response['results'][0]['generated_text']
         else:
-            response_text = "No relevant information found in the documents."
+            response_text = "No relevant documents found."
 
     st.session_state.history.append({"role": "assistant", "content": response_text})
     st.chat_message("assistant", avatar="🟨").markdown(response_text)
