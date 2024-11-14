@@ -73,7 +73,7 @@ if QUERY:
 
     # Define model parameters
     model = Model(
-        model_id="meta-llama/llama-2-70b-chat",
+        model_id="meta-llama/llama-3-1-70b-instruct",
         params={
             "decoding_method": "greedy",
             "max_new_tokens": 300,
