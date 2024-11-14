@@ -5,108 +5,95 @@ from ibm_watson_machine_learning.foundation_models import Model
 from ibm_watson_machine_learning.metanames import GenTextParamsMetaNames as GenParams
 
 # IBM Watson Discovery Credentials
-authenticator = IAMAuthenticator('5sSmoI6y0ZHP7D3a6Iu80neypsbK3tsUZR_VdRAb7ed2')
+authenticator = IAMAuthenticator('your_discovery_api_key')
 discovery = DiscoveryV2(
     version='2020-08-30',
     authenticator=authenticator
 )
-discovery.set_service_url('https://api.us-south.discovery.watson.cloud.ibm.com/instances/62dc0387-6c6f-4128-b479-00cf5dea09ef')
+discovery.set_service_url('https://api.us-south.discovery.watson.cloud.ibm.com/instances/your_instance')
 
 # Watsonx Model Setup
 url = "https://us-south.ml.cloud.ibm.com"
-api_key = "zf-5qgRvW-_RMBGb0bQw5JPPGGj5wdYpLVypdjQxBGJz"
-watsonx_project_id = "32a4b026-a46a-48df-aae3-31e16caabc3b"
+api_key = "your_watsonx_api_key"
+watsonx_project_id = "your_watsonx_project_id"
 model_type = "meta-llama/llama-3-1-70b-instruct"
 
 # Streamlit UI setup
 st.set_page_config(page_title="Watsonx AI and Discovery Integration", layout="wide")
 st.title("Watsonx AI and Discovery Integration")
 
-# Sidebar for selecting mode
-mode = st.sidebar.radio("Select Mode", ["Watson Discovery", "LLM"])
+# Sidebar for selecting mode and uploading files
+with st.sidebar:
+    st.header("Document Uploader and Mode Selection")
+    mode = st.radio("Select Mode", ["Watson Discovery", "LLM"], index=0)
 
-# Sidebar for Model Parameters
-st.sidebar.header("Watsonx Model Settings")
-max_tokens = st.sidebar.slider("Max Output Tokens", 100, 4000, 600)
-decoding = st.sidebar.radio("Decoding Method", ["greedy", "sample"])
-temperature = st.sidebar.slider("Temperature", 0.0, 1.0, 0.7)
+    # File upload for document retrieval in LLM mode
+    uploaded_file = st.file_uploader("Upload file for RAG", accept_multiple_files=False, type=["pdf", "docx", "txt", "pptx", "csv", "json", "xml", "yaml", "html"])
+    
+    # Sidebar for Model Parameters in LLM mode
+    if mode == "LLM":
+        st.header("Watsonx Model Settings")
+        max_tokens = st.slider("Max Output Tokens", 100, 4000, 600)
+        decoding = st.radio("Decoding Method", ["greedy", "sample"])
+        temperature = st.slider("Temperature", 0.0, 1.0, 0.7)
 
-# Clear Messages button in Sidebar
-if st.sidebar.button("Clear Messages"):
-    st.session_state.history = []
+        # Watsonx model generator
+        def get_model(model_type, max_tokens, temperature):
+            generate_params = {
+                GenParams.MAX_NEW_TOKENS: max_tokens,
+                GenParams.DECODING_METHOD: decoding,
+                GenParams.TEMPERATURE: temperature,
+            }
+            model = Model(
+                model_id=model_type,
+                params=generate_params,
+                credentials={"apikey": api_key, "url": url},
+                project_id=watsonx_project_id
+            )
+            return model
 
-# Define the model generator function
-def get_model(model_type, max_tokens, temperature):
-    generate_params = {
-        GenParams.MAX_NEW_TOKENS: max_tokens,
-        GenParams.DECODING_METHOD: decoding,
-        GenParams.TEMPERATURE: temperature,
-    }
-    model = Model(
-        model_id=model_type,
-        params=generate_params,
-        credentials={"apikey": api_key, "url": url},
-        project_id=watsonx_project_id
-    )
-    return model
+# Main Chat Section
+st.header("Chat with Watsonx AI or Discovery")
 
 # Initialize chat history
 if "history" not in st.session_state:
     st.session_state.history = []
 
-# Input for the question
-question = st.text_input("Ask your question here:")
-
-# Check if the 'Get Answer' button is pressed
-if st.button('Get Answer'):
-    if question:
-        if mode == "LLM":
-            # Display LLM invocation message
-            st.session_state.history.insert(0, ("🟦", "Invoking LLM...", "🟦", ""))
-            
-            # Prepare prompt for Watsonx LLM
-            prompt = (
-                "<s>[INST] <<SYS>> "
-                "Please answer the following question in one sentence using this text. "
-                "If the question is unanswerable, say 'unanswerable'. "
-                "Question:" + question + "<</SYS>>[/INST]"
-            )
-
-            # Generate answer from Watsonx LLM
-            model = get_model(model_type, max_tokens, temperature)
-            generated_response = model.generate(prompt)
-            bot_response = generated_response['results'][0]['generated_text']
-
-            # Add to history with icons
-            st.session_state.history.insert(0, (question, bot_response, "🟥", "🟨"))
-
-        elif mode == "Watson Discovery":
-            # Add system message to history
-            st.session_state.history.insert(0, ("🟦", "Retrieving answer from Watson Discovery...", "🟦", ""))
-
-            # Query Watson Discovery
-            response = discovery.query(
-                project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',
-                collection_ids=['1d91d603-cd71-5cf5-0000-019325bcd328'],
-                passages={'enabled': True, 'max_per_document': 5, 'find_answers': True},
-                natural_language_query=question
-            ).get_result()
-
-            # Process Discovery response
-            try:
-                passages = response['results'][0]['document_passages']
-                passages = [p['passage_text'].replace('<em>', '').replace('</em>', '').replace('\n', '') for p in passages]
-                bot_response = '\n'.join(passages)
-            except IndexError:
-                bot_response = "No relevant document found in Watson Discovery."
-
-            # Add to history with icons
-            st.session_state.history.insert(0, (question, bot_response, "🟥", "🟨"))
-
+# Display chat messages
+for message in st.session_state.history:
+    if message["role"] == "user":
+        st.chat_message(message["role"], avatar="🟦").markdown(message["content"])
     else:
-        st.error("Please enter a question!")
+        st.chat_message(message["role"], avatar="🟨").markdown(message["content"])
 
-# Display chat history (with the latest on top)
-for i, (user_msg, bot_msg, icon_user, icon_bot) in enumerate(st.session_state.history):
-    st.write(f"{icon_user} User:", user_msg)
-    st.write(f"{icon_bot} Assistant:", bot_msg)
+# Text input for questions
+prompt = st.chat_input("Ask your question here", disabled=False if mode == "LLM" or mode == "Watson Discovery" else True)
+
+# Button for query submission and generating responses
+if prompt:
+    st.chat_message("user", avatar="🟦").markdown(prompt)
+    st.session_state.history.append({"role": "user", "content": prompt})
+
+    if mode == "LLM":
+        model = get_model(model_type, max_tokens, temperature)
+        prompt_text = f"<s>[INST] <<SYS>> Please answer the question: {prompt}<</SYS>>[/INST]"
+        response = model.generate(prompt_text)
+        response_text = response['results'][0]['generated_text']
+
+    elif mode == "Watson Discovery":
+        query_response = discovery.query(
+            project_id='your_project_id',
+            natural_language_query=prompt,
+            count=1
+        ).get_result()
+        if query_response['results']:
+            response_text = query_response['results'][0]['text']
+        else:
+            response_text = "No relevant documents found."
+
+    st.session_state.history.append({"role": "assistant", "content": response_text})
+    st.chat_message("assistant", avatar="🟨").markdown(response_text)
+
+# Button to clear chat history
+if st.sidebar.button("Clear Messages"):
+    st.session_state.history = []
