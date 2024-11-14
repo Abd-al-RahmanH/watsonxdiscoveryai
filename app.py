@@ -19,10 +19,10 @@ url = "https://us-south.ml.cloud.ibm.com"
 api_key = "zf-5qgRvW-_RMBGb0bQw5JPPGGj5wdYpLVypdjQxBGJz"
 watsonx_project_id = "32a4b026-a46a-48df-aae3-31e16caabc3b"
 model_type = "meta-llama/llama-3-1-70b-instruct"
-max_tokens = 4000
+max_tokens = 4000  # Hardcoded as requested
 min_tokens = 50
 decoding = DecodingMethods.GREEDY
-temperature = 0.7
+temperature = 0.7  # Hardcoded as requested
 
 # Define the model generator function
 def get_model(model_type, max_tokens, min_tokens, decoding, temperature):
@@ -42,33 +42,15 @@ def get_model(model_type, max_tokens, min_tokens, decoding, temperature):
 
 # Streamlit UI setup
 st.title("Watsonx AI and Discovery Integration")
-st.write("This app allows you to ask questions, which will be answered by a combination of Watson Discovery and Watsonx model.")
+st.write("Ask your question below to get an answer from Watson Discovery and Watsonx AI.")
 
 # Input for the question
 question = st.text_input("Enter your question:")
 
-# Button to clear chat history
-if st.sidebar.button("Clear Messages"):
-    if "messages" in st.session_state:
-        st.session_state.messages = []
-
-# Initializing session state for chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Display existing chat history
-for message in st.session_state.messages:
-    st.chat_message(message["role"]).markdown(message["content"])
-
-# Process and display the answer
 if st.button('Get Answer'):
     if question:
-        # Append user question to chat history
-        st.session_state.messages.append({'role': 'User', 'content': question})
-        st.chat_message("user").markdown(question)
-
         try:
-            # Query Watson Discovery
+            # Query IBM Watson Discovery
             response = discovery.query(
                 project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',
                 collection_ids=['1d91d603-cd71-5cf5-0000-019325bcd328'],
@@ -77,28 +59,35 @@ if st.button('Get Answer'):
             ).get_result()
 
             # Process the Discovery response
-            passages = response.get('results', [])[0].get('document_passages', [])
-            passages = [p['passage_text'].replace('<em>', '').replace('</em>', '').replace('\n', '') for p in passages]
-            context = '\n '.join(passages)
+            if response.get('results'):
+                passages = response['results'][0].get('document_passages', [])
+                # Extracting and formatting passages
+                passages = [
+                    p['passage_text'].replace('<em>', '').replace('</em>', '').replace('\n', '') 
+                    for p in passages
+                ]
+                context = ' '.join(passages)
 
-            # Prepare the prompt for Watsonx
-            prompt = (
-                "<s>[INST] <<SYS>> "
-                "Please answer the following question in one sentence using this text. "
-                "If the question is unanswerable, say 'unanswerable'. "
-                "Do not include information that's not relevant to the question. "
-                "Question:" + question +
-                '<</SYS>>' + context + '[/INST]'
-            )
+                # Prepare prompt for Watsonx
+                prompt = (
+                    "<s>[INST] <<SYS>> "
+                    "Please answer the following question in one sentence using this text. "
+                    "If the question is unanswerable, say 'unanswerable'. "
+                    "Do not include irrelevant information. "
+                    "Question: " + question +
+                    " <</SYS>>" + context + " [/INST]"
+                )
 
-            # Generate the answer using Watsonx
-            model = get_model(model_type, max_tokens, min_tokens, decoding, temperature)
-            generated_response = model.generate(prompt)
-            response_text = generated_response['results'][0]['generated_text']
+                # Generate response using Watsonx
+                model = get_model(model_type, max_tokens, min_tokens, decoding, temperature)
+                generated_response = model.generate(prompt)
+                response_text = generated_response['results'][0]['generated_text']
 
-            # Append assistant response to chat history
-            st.session_state.messages.append({'role': 'Assistant', 'content': response_text})
-            st.chat_message("assistant").markdown(response_text)
+                # Display the answer
+                st.subheader("Generated Answer:")
+                st.write(response_text)
+            else:
+                st.write("No relevant results found in Discovery.")
 
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
