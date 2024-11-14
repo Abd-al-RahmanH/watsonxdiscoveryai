@@ -33,7 +33,7 @@ decoding = DecodingMethods.GREEDY
 if st.sidebar.button("Clear Messages"):
     st.session_state.history = []
 
-# Initialize message history and clear_input flag
+# Initialize message history
 if "history" not in st.session_state:
     st.session_state.history = []
 if "input_question" not in st.session_state:
@@ -64,20 +64,20 @@ for entry in st.session_state.history:
     st.markdown(f"**You:** {entry['question']}")
     st.markdown(f"**Answer:** {entry['response']}")
 
-# Input for the question (placed at the bottom)
-question = st.text_input("Enter your question:", key="input_question", value=st.session_state.input_question)
+# Input for the question with a temporary key
+question_temp = st.text_input("Enter your question:", key="input_question_temp")
 
 # Submit button for the question
 if st.button("Submit Question"):
     # Save question to session state
-    st.session_state.input_question = question
+    st.session_state.input_question = question_temp
 
     # Query Watson Discovery
     response = discovery.query(
         project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',
         collection_ids=['1d91d603-cd71-5cf5-0000-019325bcd328'],
         passages={'enabled': True, 'max_per_document': 5, 'find_answers': True},
-        natural_language_query=question
+        natural_language_query=st.session_state.input_question
     ).get_result()
 
     # Process the Discovery response
@@ -95,7 +95,7 @@ if st.button("Submit Question"):
         "Do not answer other questions. "
         "Make sure the language used is English.'"
         "Do not use repetitions' "
-        "Question:" + question + 
+        "Question:" + st.session_state.input_question + 
         '<</SYS>>' + context + '[/INST]'
     )
 
@@ -105,9 +105,10 @@ if st.button("Submit Question"):
     response_text = generated_response['results'][0]['generated_text']
 
     # Append to history
-    st.session_state.history.append({"question": question, "response": response_text})
+    st.session_state.history.append({"question": st.session_state.input_question, "response": response_text})
     
     # Clear the input question
     st.session_state.input_question = ""
+    st.session_state.input_question_temp = ""  # Clear the temporary input
 
 # This version should avoid the error and clear the question input field after submission.
