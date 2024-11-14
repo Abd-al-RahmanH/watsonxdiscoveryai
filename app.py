@@ -24,9 +24,12 @@ st.title("Watsonx AI and Discovery Integration")
 
 # Sidebar for selecting mode and uploading files
 with st.sidebar:
-    st.header("Mode Selection")
+    st.header("Document Uploader and Mode Selection")
     mode = st.radio("Select Mode", ["Watson Discovery", "LLM"], index=0)
 
+    # File upload for document retrieval in LLM mode
+    uploaded_file = st.file_uploader("Upload file for RAG", accept_multiple_files=False, type=["pdf", "docx", "txt", "pptx", "csv", "json", "xml", "yaml", "html"])
+    
     # Sidebar for Model Parameters in LLM mode
     if mode == "LLM":
         st.header("Watsonx Model Settings")
@@ -34,10 +37,20 @@ with st.sidebar:
         decoding = st.radio("Decoding Method", ["greedy", "sample"])
         temperature = st.slider("Temperature", 0.0, 1.0, 0.7)
 
-    elif mode == "Watson Discovery":
-        st.header("Watson Discovery Output Settings")
-        max_results = st.slider("Max Results to Return", 1, 10, 3)
-        passage_retrieval = st.checkbox("Enable Passage Retrieval", value=True)
+        # Watsonx model generator
+        def get_model(model_type, max_tokens, temperature):
+            generate_params = {
+                GenParams.MAX_NEW_TOKENS: max_tokens,
+                GenParams.DECODING_METHOD: decoding,
+                GenParams.TEMPERATURE: temperature,
+            }
+            model = Model(
+                model_id=model_type,
+                params=generate_params,
+                credentials={"apikey": api_key, "url": url},
+                project_id=watsonx_project_id
+            )
+            return model
 
 # Main Chat Section
 st.header("Chat with Watsonx AI or Discovery")
@@ -62,20 +75,6 @@ if prompt:
     st.session_state.history.append({"role": "user", "content": prompt})
 
     if mode == "LLM":
-        def get_model(model_type, max_tokens, temperature):
-            generate_params = {
-                GenParams.MAX_NEW_TOKENS: max_tokens,
-                GenParams.DECODING_METHOD: decoding,
-                GenParams.TEMPERATURE: temperature,
-            }
-            model = Model(
-                model_id=model_type,
-                params=generate_params,
-                credentials={"apikey": api_key, "url": url},
-                project_id=watsonx_project_id
-            )
-            return model
-
         model = get_model(model_type, max_tokens, temperature)
         prompt_text = f"<s>[INST] <<SYS>> Please answer the question: {prompt}<</SYS>>[/INST]"
         response = model.generate(prompt_text)
@@ -86,16 +85,18 @@ if prompt:
             project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',  # project_id from notebook
             collection_ids=['1d91d603-cd71-5cf5-0000-019325bcd328'],  # collection_id from notebook
             natural_language_query=prompt,
-            count=max_results,
-            passages=passage_retrieval
+            count=1,
+            highlight=True  # Enable highlights to retrieve specific passages
         ).get_result()
-        if query_response['results']:
-            if passage_retrieval and 'passages' in query_response['results'][0]:
-                response_text = query_response['results'][0]['passages'][0]['passage_text']
-            else:
-                response_text = query_response['results'][0]['text']
+        
+        # Check if there are any highlights in the results
+        if query_response['results'] and 'highlight' in query_response['results'][0]:
+            # Get the highlighted text from the response
+            highlights = query_response['results'][0]['highlight']['text']
+            # Join multiple highlights if present
+            response_text = "\n".join(highlights)
         else:
-            response_text = "No relevant documents found."
+            response_text = "No relevant information found in the documents."
 
     st.session_state.history.append({"role": "assistant", "content": response_text})
     st.chat_message("assistant", avatar="🟨").markdown(response_text)
