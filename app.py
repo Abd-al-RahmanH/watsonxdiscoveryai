@@ -64,14 +64,16 @@ if st.button('Get Answer'):
 
         # Prepare the prompt for Watsonx
         prompt = (
-            """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-          I am a helpful assistant.
-
-          <|eot_id|>
-         {context}
-          <|start_header_id|>user<|end_header_id|>
-         {question}<|eot_id|>
-           """
+           "<s>[INST] <<SYS>> "
+            "Please answer the following question in a step by step using this text. "
+            "If the question is unanswerable, say 'unanswerable'. "
+            "If you responded to the question, don't say 'unanswerable'. "
+            "Do not include information that's not relevant to the question. "
+            "Do not answer other questions. "
+            "Make sure the language used is English.'"
+            "Do not use repetitions' "
+            "Question:" + question + 
+            '<</SYS>>' + context + '[/INST]'
         )
 
         # Generate the answer using Watsonx
