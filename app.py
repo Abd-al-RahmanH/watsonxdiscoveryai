@@ -4,18 +4,18 @@ from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 from ibm_watson_machine_learning.foundation_models import Model
 from ibm_watson_machine_learning.metanames import GenTextParamsMetaNames as GenParams
 
-# IBM Watson Discovery and Watsonx Credentials (replace with your keys)
-authenticator = IAMAuthenticator('YOUR_DISCOVERY_API_KEY')
+# IBM Watson Discovery Credentials
+authenticator = IAMAuthenticator('your_discovery_api_key')
 discovery = DiscoveryV2(
     version='2020-08-30',
     authenticator=authenticator
 )
-discovery.set_service_url('YOUR_DISCOVERY_SERVICE_URL')
+discovery.set_service_url('your_discovery_service_url')
 
 # Watsonx Model Setup
-url = "YOUR_WATSONX_URL"
-api_key = "YOUR_WATSONX_API_KEY"
-watsonx_project_id = "YOUR_WATSONX_PROJECT_ID"
+url = "your_watsonx_url"
+api_key = "your_watsonx_api_key"
+watsonx_project_id = "your_watsonx_project_id"
 model_type = "meta-llama/llama-3-1-70b-instruct"
 
 # Streamlit UI setup
@@ -87,7 +87,7 @@ if st.button('Get Answer'):
         elif mode == "Watson Discovery":
             # Query Watson Discovery
             response = discovery.query(
-                project_id='YOUR_DISCOVERY_PROJECT_ID',
+                project_id='your_discovery_project_id',
                 collection_ids=['YOUR_COLLECTION_ID'],
                 passages={'enabled': True, 'max_per_document': 5, 'find_answers': True},
                 natural_language_query=question
