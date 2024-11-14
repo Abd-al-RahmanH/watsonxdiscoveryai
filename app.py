@@ -63,7 +63,7 @@ if st.button('Get Answer'):
         context = '\n '.join(passages)
 
         # Prepare the prompt for Watsonx
-       prompt = (
+prompt = (
     "<s>[INST] <<SYS>> "
     "Please provide a detailed, step-by-step guide to answer the following question. "
     "If the question is unanswerable, say 'unanswerable'. "
