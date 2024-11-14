@@ -1,88 +1,97 @@
 import streamlit as st
-import json
 from ibm_watson import DiscoveryV2
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
-from ibm_watson_machine_learning.foundation_models import Model
-from ibm_watson_machine_learning.metanames import GenTextParamsMetaNames as GenParams
-from ibm_watson_machine_learning.foundation_models.utils.enums import ModelTypes, DecodingMethods
+from ibm_watsonx_ai import Credentials
+from ibm_watsonx_ai.foundation_models import Model
 
-# IBM Watson Discovery and Watsonx Credentials (replace with your keys)
-authenticator = IAMAuthenticator('5sSmoI6y0ZHP7D3a6Iu80neypsbK3tsUZR_VdRAb7ed2')
-discovery = DiscoveryV2(
-    version='2020-08-30',
-    authenticator=authenticator
+# Hardcoded credentials
+IBM_DISC_API_KEY = '5sSmoI6y0ZHP7D3a6Iu80neypsbK3tsUZR_VdRAb7ed2'
+IBM_DISC_PROJ_ID = '016da9fc-26f5-464a-a0b8-c9b0b9da83c7'
+IBM_DISC_SERVICE_URL = 'https://api.us-south.discovery.watson.cloud.ibm.com/instances/62dc0387-6c6f-4128-b479-00cf5dea09ef'
+IBM_DISC_COLL_ID = '1d91d603-cd71-5cf5-0000-019325bcd328'
+
+IBM_WX_API_KEY = 'zf-5qgRvW-_RMBGb0bQw5JPPGGj5wdYpLVypdjQxBGJz'
+IBM_WX_PROJ_ID = '32a4b026-a46a-48df-aae3-31e16caabc3b'
+IBM_WX_SERVICE_URL = 'https://us-south.ml.cloud.ibm.com'
+
+# Authentication with services
+authenticator = IAMAuthenticator(IBM_DISC_API_KEY)
+discovery = DiscoveryV2(version='2020-08-30', authenticator=authenticator)
+discovery.set_service_url(IBM_DISC_SERVICE_URL)
+discovery.set_disable_ssl_verification(True)
+
+ai_credentials = Credentials(
+    url=IBM_WX_SERVICE_URL,
+    api_key=IBM_WX_API_KEY
 )
-discovery.set_service_url('https://api.us-south.discovery.watson.cloud.ibm.com/instances/62dc0387-6c6f-4128-b479-00cf5dea09ef')
 
-# Watsonx Model Setup
-url = "https://us-south.ml.cloud.ibm.com"
-api_key = "zf-5qgRvW-_RMBGb0bQw5JPPGGj5wdYpLVypdjQxBGJz"
-watsonx_project_id = "32a4b026-a46a-48df-aae3-31e16caabc3b"
-model_type = "meta-llama/llama-3-405b-instruct"
-max_tokens = 500
-min_tokens = 50
-decoding = DecodingMethods.GREEDY
-temperature = 0.8
+# Define the prompt template
+PROMPT_TEMPLATE = '''
+CONTEXT:
+%s
 
-# Define the model generator function
-def get_model(model_type, max_tokens, min_tokens, decoding, temperature):
-    generate_params = {
-        GenParams.MAX_NEW_TOKENS: max_tokens,
-        GenParams.MIN_NEW_TOKENS: min_tokens,
-        GenParams.DECODING_METHOD: decoding,
-        GenParams.TEMPERATURE: temperature,
-    }
+QUESTION:
+%s
+
+INSTRUCTIONS:
+Answer the user's QUESTION using the CONTEXT text above.
+Keep your answer grounded in the facts of the CONTEXT.
+If the CONTEXT doesn't contain the facts to answer the QUESTION return "I don't know".
+
+ANSWER:
+'''
+
+# Streamlit app UI
+st.title("Watsonx AI & Discovery - RAG Query Answering")
+st.write("Enter a question, and the system will try to answer using IBM Watson Discovery and Watsonx AI.")
+
+# Input: Question
+QUERY = st.text_input("Enter your question:")
+
+if QUERY:
+    # Get passages from Watson Discovery
+    passage_list = discovery.query(
+        project_id=IBM_DISC_PROJ_ID,
+        natural_language_query=QUERY,
+        count=5,
+        collection_ids=[IBM_DISC_COLL_ID],
+        similar={"fields": ["text"]},
+        passages={
+            "enabled": True,
+            "per_document": True,
+            "find_answers": True,
+            "max_answers_per_passage": 1,
+            "characters": 250
+        }
+    ).get_result()['results']
+
+    # Wrap into singular string
+    passage_text = '\n\n'.join(list(map(
+        lambda x: '\n\n'.join(map(lambda p: p['passage_text'], x['document_passages'])),
+        passage_list
+    )))
+
+    # Define model parameters
     model = Model(
-        model_id=model_type,
-        params=generate_params,
-        credentials={"apikey": api_key, "url": url},
-        project_id=watsonx_project_id
+        model_id="meta-llama/llama-2-70b-chat",
+        params={
+            "decoding_method": "greedy",
+            "max_new_tokens": 300,
+            "temperature": 0,
+            "min_new_tokens": 35,
+            "repetition_penalty": 1.1,
+            "stop_sequences": ["\n\n"]
+        },
+        project_id=IBM_WX_PROJ_ID,
+        credentials=ai_credentials
     )
-    return model
 
-# Streamlit UI setup
-st.title("Watsonx AI and Discovery Integration")
-st.write("This app allows you to ask questions, which will be answered by a combination of Watson Discovery and Watsonx model.")
+    # Combine passage text and query into final prompt
+    final_prompt = PROMPT_TEMPLATE % (passage_text, QUERY)
 
-# Input for the question
-question = st.text_input("Enter your question:")
+    # Get response from the model
+    output = model.generate_text(prompt=final_prompt, guardrails=False)
 
-if st.button('Get Answer'):
-    if question:
-        # Query Watson Discovery with multiple collection IDs
-        response = discovery.query(
-            project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',
-            collection_ids=['1d91d603-cd71-5cf5-0000-019325bcd328', '8d4e1e28-ba62-6e09-0000-019329792664'],
-            passages={'enabled': True, 'max_per_document': 5, 'find_answers': True},
-            natural_language_query=question
-        ).get_result()
-
-        # Process the Discovery response
-        passages = response['results'][0]['document_passages']
-        passages = [p['passage_text'].replace('<em>', '').replace('</em>', '').replace('\n', '') for p in passages]
-        context = '\n '.join(passages)
-
-        # Prepare the prompt for Watsonx
-        prompt = (
-           "<s>[INST] <<SYS>> "
-            "Please answer the following question in a step by step using this text. "
-            "If the question is unanswerable, say 'unanswerable'. "
-            "If you responded to the question, don't say 'unanswerable'. "
-            "Do not include information that's not relevant to the question. "
-            "Do not answer other questions. "
-            "Make sure the language used is English.'"
-            "Do not use repetitions' "
-            "Question:" + question + 
-            '<</SYS>>' + context + '[/INST]'
-        )
-
-        # Generate the answer using Watsonx
-        model = get_model(model_type, max_tokens, min_tokens, decoding, temperature)
-        generated_response = model.generate(prompt)
-        response_text = generated_response['results'][0]['generated_text']
-
-        # Display the generated response
-        st.subheader("Generated Answer:")
-        st.write(response_text)
-    else:
-        st.error("Please enter a question!")
+    # Display the result
+    st.write("### Answer:")
+    st.write(output)
