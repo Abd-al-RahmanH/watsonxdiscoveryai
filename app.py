@@ -18,7 +18,7 @@ discovery.set_service_url('https://api.us-south.discovery.watson.cloud.ibm.com/i
 url = "https://us-south.ml.cloud.ibm.com"
 api_key = "zf-5qgRvW-_RMBGb0bQw5JPPGGj5wdYpLVypdjQxBGJz"
 watsonx_project_id = "32a4b026-a46a-48df-aae3-31e16caabc3b"
-model_type = "meta-llama/llama-3-1-70b-instruct"
+model_type = "meta-llama/llama-3-405b-instruct"
 max_tokens = 500
 min_tokens = 50
 decoding = DecodingMethods.GREEDY
