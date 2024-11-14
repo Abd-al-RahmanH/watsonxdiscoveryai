@@ -63,10 +63,10 @@ for entry in st.session_state.history:
     st.markdown(f"**Answer:** {entry['response']}")
 
 # Input for the question (placed at the bottom)
-question = st.text_input("Enter your question:", key="input_question", label_visibility="collapsed")
+question = st.text_input("Enter your question:", key="input_question")
 
-# Check for Enter key press
-if question:
+# Submit button for the question
+if st.button("Submit Question"):
     # Query Watson Discovery
     response = discovery.query(
         project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',
@@ -99,6 +99,8 @@ if question:
     generated_response = model.generate(prompt)
     response_text = generated_response['results'][0]['generated_text']
 
-    # Append to history and reset input box
+    # Append to history
     st.session_state.history.append({"question": question, "response": response_text})
-    st.session_state.input_question = ""  # Clear input after submission
+    # Clear the input field
+    st.session_state.input_question = ""
+
