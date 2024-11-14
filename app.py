@@ -13,12 +13,13 @@ discovery = DiscoveryV2(
     authenticator=authenticator
 )
 discovery.set_service_url('https://api.us-south.discovery.watson.cloud.ibm.com/instances/62dc0387-6c6f-4128-b479-00cf5dea09ef')
+
 # Watsonx Model Setup
 url = "https://us-south.ml.cloud.ibm.com"
 api_key = "zf-5qgRvW-_RMBGb0bQw5JPPGGj5wdYpLVypdjQxBGJz"
 watsonx_project_id = "32a4b026-a46a-48df-aae3-31e16caabc3b"
 model_type = "meta-llama/llama-3-1-70b-instruct"
-max_tokens = 100
+max_tokens = 500
 min_tokens = 50
 decoding = DecodingMethods.GREEDY
 temperature = 0.7
@@ -48,10 +49,10 @@ question = st.text_input("Enter your question:")
 
 if st.button('Get Answer'):
     if question:
-        # Query Watson Discovery
+        # Query Watson Discovery with multiple collection IDs
         response = discovery.query(
             project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',
-            collection_ids=['1d91d603-cd71-5cf5-0000-019325bcd328'],
+            collection_ids=['1d91d603-cd71-5cf5-0000-019325bcd328', '8d4e1e28-ba62-6e09-0000-019329792664'],
             passages={'enabled': True, 'max_per_document': 5, 'find_answers': True},
             natural_language_query=question
         ).get_result()
