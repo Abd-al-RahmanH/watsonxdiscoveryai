@@ -4,17 +4,22 @@ from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 from ibm_watson_machine_learning.foundation_models import Model
 from ibm_watson_machine_learning.metanames import GenTextParamsMetaNames as GenParams
 
-# IBM Watson Discovery Credentials
-authenticator = IAMAuthenticator('5sSmoI6y0ZHP7D3a6Iu80neypsbK3tsUZR_VdRAb7ed2')
+# Hardcoded IBM Watson Discovery Credentials
+discovery_api_key = '5sSmoI6y0ZHP7D3a6Iu80neypsbK3tsUZR_VdRAb7ed2'
+discovery_service_url = 'https://api.us-south.discovery.watson.cloud.ibm.com/instances/62dc0387-6c6f-4128-b479-00cf5dea09ef'
+discovery_project_id = '016da9fc-26f5-464a-a0b8-c9b0b9da83c7'
+discovery_collection_id = '1d91d603-cd71-5cf5-0000-019325bcd328'
+
+authenticator = IAMAuthenticator(discovery_api_key)
 discovery = DiscoveryV2(
     version='2020-08-30',
     authenticator=authenticator
 )
-discovery.set_service_url('https://api.us-south.discovery.watson.cloud.ibm.com/instances/62dc0387-6c6f-4128-b479-00cf5dea09ef')
+discovery.set_service_url(discovery_service_url)
 
-# Watsonx Model Setup
-url = "https://us-south.ml.cloud.ibm.com"
-api_key = "zf-5qgRvW-_RMBGb0bQw5JPPGGj5wdYpLVypdjQxBGJz"
+# Hardcoded Watsonx Model Credentials
+watsonx_api_key = "zf-5qgRvW-_RMBGb0bQw5JPPGGj5wdYpLVypdjQxBGJz"
+watsonx_url = "https://us-south.ml.cloud.ibm.com"
 watsonx_project_id = "32a4b026-a46a-48df-aae3-31e16caabc3b"
 model_type = "meta-llama/llama-3-1-70b-instruct"
 
@@ -47,7 +52,7 @@ with st.sidebar:
             model = Model(
                 model_id=model_type,
                 params=generate_params,
-                credentials={"apikey": api_key, "url": url},
+                credentials={"apikey": watsonx_api_key, "url": watsonx_url},
                 project_id=watsonx_project_id
             )
             return model
@@ -81,24 +86,14 @@ if prompt:
         response_text = response['results'][0]['generated_text']
 
     elif mode == "Watson Discovery":
-        # Query Watson Discovery
         query_response = discovery.query(
-            project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',  # project_id from notebook
-            collection_ids=['1d91d603-cd71-5cf5-0000-019325bcd328'],  # collection_id from notebook
+            project_id=discovery_project_id,
+            collection_ids=[discovery_collection_id],
             natural_language_query=prompt,
-            count=1,
-            highlight=True
+            count=1
         ).get_result()
-        
         if query_response['results']:
-            # Extract highlighted text or main text
-            result_text = query_response['results'][0].get('highlight', {}).get('text', [""])[0] or query_response['results'][0]['text']
-            
-            # Use the LLM to summarize or refine Watson Discovery results
-            model = get_model(model_type, max_tokens, temperature)
-            prompt_text = f"<s>[INST] <<SYS>> Based on the following document content, please provide a concise answer to the question: {prompt} <<USER>> {result_text} <</USER>[/INST]"
-            response = model.generate(prompt_text)
-            response_text = response['results'][0]['generated_text']
+            response_text = query_response['results'][0]['text']
         else:
             response_text = "No relevant documents found."
 
