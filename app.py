@@ -36,8 +36,8 @@ if st.sidebar.button("Clear Messages"):
 # Initialize message history and clear_input flag
 if "history" not in st.session_state:
     st.session_state.history = []
-if "clear_input" not in st.session_state:
-    st.session_state.clear_input = False
+if "input_question" not in st.session_state:
+    st.session_state.input_question = ""
 
 # Function to get Watsonx model
 def get_model(model_type, max_tokens, min_tokens, decoding, temperature):
@@ -65,10 +65,13 @@ for entry in st.session_state.history:
     st.markdown(f"**Answer:** {entry['response']}")
 
 # Input for the question (placed at the bottom)
-question = st.text_input("Enter your question:", key="input_question")
+question = st.text_input("Enter your question:", key="input_question", value=st.session_state.input_question)
 
 # Submit button for the question
 if st.button("Submit Question"):
+    # Save question to session state
+    st.session_state.input_question = question
+
     # Query Watson Discovery
     response = discovery.query(
         project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',
@@ -104,10 +107,7 @@ if st.button("Submit Question"):
     # Append to history
     st.session_state.history.append({"question": question, "response": response_text})
     
-    # Set flag to clear input
-    st.session_state.clear_input = True
-
-# Check if clear_input flag is set and clear the input
-if st.session_state.clear_input:
+    # Clear the input question
     st.session_state.input_question = ""
-    st.session_state.clear_input = False
+
+# This version should avoid the error and clear the question input field after submission.
