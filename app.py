@@ -26,28 +26,18 @@ st.title("Watsonx AI and Discovery Integration")
 
 # Sidebar for Model Parameters
 st.sidebar.header("Watsonx Model Settings")
-max_tokens = st.sidebar.slider("Max Tokens", 50, 200, 100)
-min_tokens = st.sidebar.slider("Min Tokens", 0, 50, 50)
-decoding = st.sidebar.selectbox("Decoding Method", [DecodingMethods.GREEDY, DecodingMethods.SAMPLE])
+max_tokens = st.sidebar.slider("Max Output Tokens", 100, 4000, 600)
+decoding = st.sidebar.radio("Decoding Method", ["greedy", "sample"])
 temperature = st.sidebar.slider("Temperature", 0.0, 1.0, 0.7)
 
 # Clear Messages button in Sidebar
 if st.sidebar.button("Clear Messages"):
     st.session_state.history = []
 
-# Display History in Sidebar
-st.sidebar.header("Chat History")
-if "history" not in st.session_state:
-    st.session_state.history = []
-for i, (q, a) in enumerate(st.session_state.history):
-    st.sidebar.write(f"Q{i+1}: {q}")
-    st.sidebar.write(f"A{i+1}: {a}")
-
 # Define the model generator function
-def get_model(model_type, max_tokens, min_tokens, decoding, temperature):
+def get_model(model_type, max_tokens, temperature):
     generate_params = {
         GenParams.MAX_NEW_TOKENS: max_tokens,
-        GenParams.MIN_NEW_TOKENS: min_tokens,
         GenParams.DECODING_METHOD: decoding,
         GenParams.TEMPERATURE: temperature,
     }
@@ -59,13 +49,23 @@ def get_model(model_type, max_tokens, min_tokens, decoding, temperature):
     )
     return model
 
-st.write("This app allows you to ask questions, which will be answered by a combination of Watson Discovery and Watsonx model.")
+# Initialize chat history
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+# Display chat history
+for i, (user_msg, bot_msg, icon) in enumerate(st.session_state.history):
+    st.write(f"User ({icon}):", user_msg)
+    st.write(f"Assistant:", bot_msg)
 
 # Input for the question
-question = st.text_input("Enter your question:")
+question = st.text_input("Ask your question here:")
 
 if st.button('Get Answer'):
     if question:
+        # Display LLM invocation message
+        st.info("Invoking LLM...")
+
         # Query Watson Discovery
         response = discovery.query(
             project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',
@@ -74,35 +74,38 @@ if st.button('Get Answer'):
             natural_language_query=question
         ).get_result()
 
-        # Process the Discovery response
-        passages = response['results'][0]['document_passages']
-        passages = [p['passage_text'].replace('<em>', '').replace('</em>', '').replace('\n', '') for p in passages]
-        context = '\n '.join(passages)
+        # Process Discovery response
+        try:
+            passages = response['results'][0]['document_passages']
+            passages = [p['passage_text'].replace('<em>', '').replace('</em>', '').replace('\n', '') for p in passages]
+            context = '\n '.join(passages)
+            answer_from_discovery = True
+        except IndexError:
+            context = "No relevant document found."
+            answer_from_discovery = False
 
-        # Prepare the prompt for Watsonx
-        prompt = (
-            "<s>[INST] <<SYS>> "
-            "Please answer the following question in one sentence using this text. "
-            "If the question is unanswerable, say 'unanswerable'. "
-            "If you responded to the question, don't say 'unanswerable'. "
-            "Do not include information that's not relevant to the question. "
-            "Do not answer other questions. "
-            "Make sure the language used is English.'"
-            "Do not use repetitions' "
-            "Question:" + question + 
-            '<</SYS>>' + context + '[/INST]'
-        )
+        if answer_from_discovery:
+            bot_response = context
+        else:
+            # Prepare the prompt for Watsonx if Discovery fails
+            prompt = (
+                "<s>[INST] <<SYS>> "
+                "Please answer the following question in one sentence using this text. "
+                "If the question is unanswerable, say 'unanswerable'. "
+                "Question:" + question + 
+                '<</SYS>>' + context + '[/INST]'
+            )
 
-        # Generate the answer using Watsonx
-        model = get_model(model_type, max_tokens, min_tokens, decoding, temperature)
-        generated_response = model.generate(prompt)
-        response_text = generated_response['results'][0]['generated_text']
+            # Generate the answer using Watsonx
+            model = get_model(model_type, max_tokens, temperature)
+            generated_response = model.generate(prompt)
+            bot_response = generated_response['results'][0]['generated_text']
+
+        # Add question and answer to history with icons
+        st.session_state.history.append((question, bot_response, "🔴" if answer_from_discovery else "🟡"))
 
         # Display the generated response
-        st.subheader("Generated Answer:")
-        st.write(response_text)
-
-        # Add question and answer to history
-        st.session_state.history.append((question, response_text))
+        st.write("Generated Answer:")
+        st.write(bot_response)
     else:
         st.error("Please enter a question!")
