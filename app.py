@@ -24,7 +24,7 @@ model_type = st.sidebar.selectbox(
     options=["meta-llama/llama-3-1-70b-instruct", "meta-gpt/gpt-3.5-turbo", "meta-bert/bert-large"],
     index=0
 )
-max_tokens = st.sidebar.slider("Max Tokens", min_value=50, max_value=1000, value=100, step=10)
+max_tokens = st.sidebar.slider("Max Tokens", min_value=50, max_value=1000, value=230, step=10)
 min_tokens = st.sidebar.slider("Min Tokens", min_value=10, max_value=100, value=50, step=5)
 temperature = st.sidebar.slider("Temperature", min_value=0.0, max_value=1.0, value=0.7)
 decoding = DecodingMethods.GREEDY
@@ -62,9 +62,10 @@ for entry in st.session_state.history:
     st.markdown(f"**You:** {entry['question']}")
     st.markdown(f"**Answer:** {entry['response']}")
 
-# Input for the question
+# Input for the question (placed at the bottom)
 question = st.text_input("Enter your question:", key="input_question", label_visibility="collapsed")
 
+# Check for Enter key press
 if question:
     # Query Watson Discovery
     response = discovery.query(
@@ -98,6 +99,6 @@ if question:
     generated_response = model.generate(prompt)
     response_text = generated_response['results'][0]['generated_text']
 
-    # Append to history and display response
+    # Append to history and reset input box
     st.session_state.history.append({"question": question, "response": response_text})
-    st.experimental_rerun()
+    st.session_state.input_question = ""  # Clear input after submission
