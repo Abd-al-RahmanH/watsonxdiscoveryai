@@ -22,7 +22,7 @@ model_type = "meta-llama/llama-3-1-70b-instruct"
 max_tokens = 500
 min_tokens = 50
 decoding = DecodingMethods.GREEDY
-temperature = 0.7
+temperature = 0.8
 
 # Define the model generator function
 def get_model(model_type, max_tokens, min_tokens, decoding, temperature):
