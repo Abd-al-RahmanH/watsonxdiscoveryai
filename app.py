@@ -54,20 +54,16 @@ def get_model(model_type, max_tokens, temperature):
 if "history" not in st.session_state:
     st.session_state.history = []
 
-# Display chat history with icons
-for i, (user_msg, bot_msg, icon_user, icon_bot) in enumerate(st.session_state.history):
-    st.write(f"{icon_user} User:", user_msg)
-    st.write(f"{icon_bot} Assistant:", bot_msg)
-
 # Input for the question
 question = st.text_input("Ask your question here:")
 
+# Check if the 'Get Answer' button is pressed
 if st.button('Get Answer'):
     if question:
         if mode == "LLM":
             # Display LLM invocation message
-            st.info("Invoking LLM...")
-
+            st.session_state.history.insert(0, ("🟦", "Invoking LLM...", "🟦", ""))
+            
             # Prepare prompt for Watsonx LLM
             prompt = (
                 "<s>[INST] <<SYS>> "
@@ -82,9 +78,12 @@ if st.button('Get Answer'):
             bot_response = generated_response['results'][0]['generated_text']
 
             # Add to history with icons
-            st.session_state.history.append((question, bot_response, "🟥", "🟨"))
+            st.session_state.history.insert(0, (question, bot_response, "🟥", "🟨"))
 
         elif mode == "Watson Discovery":
+            # Add system message to history
+            st.session_state.history.insert(0, ("🟦", "Retrieving answer from Watson Discovery...", "🟦", ""))
+
             # Query Watson Discovery
             response = discovery.query(
                 project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',
@@ -102,10 +101,12 @@ if st.button('Get Answer'):
                 bot_response = "No relevant document found in Watson Discovery."
 
             # Add to history with icons
-            st.session_state.history.append((question, bot_response, "🟥", "🟨"))
+            st.session_state.history.insert(0, (question, bot_response, "🟥", "🟨"))
 
-        # Display the generated response
-        st.write("Generated Answer:")
-        st.write(bot_response)
     else:
         st.error("Please enter a question!")
+
+# Display chat history (with the latest on top)
+for i, (user_msg, bot_msg, icon_user, icon_bot) in enumerate(st.session_state.history):
+    st.write(f"{icon_user} User:", user_msg)
+    st.write(f"{icon_bot} Assistant:", bot_msg)
