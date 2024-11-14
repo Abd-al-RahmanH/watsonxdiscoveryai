@@ -64,12 +64,14 @@ if st.button('Get Answer'):
 
         # Prepare the prompt for Watsonx
         prompt = (
-            "<s>[INST] <<SYS>> "
-            "I am a helpful assistant."
-            "If the question is unanswerable, say 'unanswerable'. "
-            "Make sure each step is clearly explained from the dataset if not available make sure answer from LLM. "
-            "Question:" + question + 
-            '<</SYS>>' + context + '[/INST]'
+            """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+          I am a helpful assistant.
+
+          <|eot_id|>
+         {context}
+          <|start_header_id|>user<|end_header_id|>
+         {question}<|eot_id|>
+           """
         )
 
         # Generate the answer using Watsonx
