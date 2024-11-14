@@ -33,9 +33,11 @@ decoding = DecodingMethods.GREEDY
 if st.sidebar.button("Clear Messages"):
     st.session_state.history = []
 
-# Initialize message history
+# Initialize message history and clear_input flag
 if "history" not in st.session_state:
     st.session_state.history = []
+if "clear_input" not in st.session_state:
+    st.session_state.clear_input = False
 
 # Function to get Watsonx model
 def get_model(model_type, max_tokens, min_tokens, decoding, temperature):
@@ -101,6 +103,11 @@ if st.button("Submit Question"):
 
     # Append to history
     st.session_state.history.append({"question": question, "response": response_text})
-    # Clear the input field
-    st.session_state.input_question = ""
+    
+    # Set flag to clear input
+    st.session_state.clear_input = True
 
+# Check if clear_input flag is set and clear the input
+if st.session_state.clear_input:
+    st.session_state.input_question = ""
+    st.session_state.clear_input = False
