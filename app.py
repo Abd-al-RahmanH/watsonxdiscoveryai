@@ -67,8 +67,7 @@ if st.button('Get Answer'):
             "<s>[INST] <<SYS>> "
             "I am a helpful assistant."
             "If the question is unanswerable, say 'unanswerable'. "
-            "Make sure each step is clearly explained. "
-            "Answer in English and avoid unnecessary repetition. "
+            "Make sure each step is clearly explained from the dataset if not available make sure answer from LLM. "
             "Question:" + question + 
             '<</SYS>>' + context + '[/INST]'
         )
