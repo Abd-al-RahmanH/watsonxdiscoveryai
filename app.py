@@ -1,97 +1,100 @@
 import streamlit as st
 from ibm_watson import DiscoveryV2
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
-from ibm_watsonx_ai import Credentials
-from ibm_watsonx_ai.foundation_models import Model
+from ibm_watson_machine_learning.foundation_models import Model
+from ibm_watson_machine_learning.metanames import GenTextParamsMetaNames as GenParams
 
-# Hardcoded credentials
-IBM_DISC_API_KEY = '5sSmoI6y0ZHP7D3a6Iu80neypsbK3tsUZR_VdRAb7ed2'
-IBM_DISC_PROJ_ID = '016da9fc-26f5-464a-a0b8-c9b0b9da83c7'
-IBM_DISC_SERVICE_URL = 'https://api.us-south.discovery.watson.cloud.ibm.com/instances/62dc0387-6c6f-4128-b479-00cf5dea09ef'
-IBM_DISC_COLL_ID = '1d91d603-cd71-5cf5-0000-019325bcd328'
-
-IBM_WX_API_KEY = 'zf-5qgRvW-_RMBGb0bQw5JPPGGj5wdYpLVypdjQxBGJz'
-IBM_WX_PROJ_ID = '32a4b026-a46a-48df-aae3-31e16caabc3b'
-IBM_WX_SERVICE_URL = 'https://us-south.ml.cloud.ibm.com'
-
-# Authentication with services
-authenticator = IAMAuthenticator(IBM_DISC_API_KEY)
-discovery = DiscoveryV2(version='2020-08-30', authenticator=authenticator)
-discovery.set_service_url(IBM_DISC_SERVICE_URL)
-discovery.set_disable_ssl_verification(True)
-
-ai_credentials = Credentials(
-    url=IBM_WX_SERVICE_URL,
-    api_key=IBM_WX_API_KEY
+# IBM Watson Discovery Credentials
+authenticator = IAMAuthenticator('5sSmoI6y0ZHP7D3a6Iu80neypsbK3tsUZR_VdRAb7ed2')
+discovery = DiscoveryV2(
+    version='2020-08-30',
+    authenticator=authenticator
 )
+discovery.set_service_url('https://api.us-south.discovery.watson.cloud.ibm.com/instances/62dc0387-6c6f-4128-b479-00cf5dea09ef')
 
-# Define the prompt template
-PROMPT_TEMPLATE = '''
-CONTEXT:
-%s
+# Watsonx Model Setup
+url = "https://us-south.ml.cloud.ibm.com"
+api_key = "zf-5qgRvW-_RMBGb0bQw5JPPGGj5wdYpLVypdjQxBGJz"
+watsonx_project_id = "32a4b026-a46a-48df-aae3-31e16caabc3b"
+model_type = "meta-llama/llama-3-1-70b-instruct"
 
-QUESTION:
-%s
+# Streamlit UI setup
+st.set_page_config(page_title="Watsonx AI and Discovery Integration", layout="wide")
+st.title("Watsonx AI and Discovery Integration")
 
-INSTRUCTIONS:
-Answer the user's QUESTION using the CONTEXT text above.
-Keep your answer grounded in the facts of the CONTEXT.
-If the CONTEXT doesn't contain the facts to answer the QUESTION return "I don't know".
+# Sidebar for selecting mode and uploading files
+with st.sidebar:
+    st.header("Document Uploader and Mode Selection")
+    mode = st.radio("Select Mode", ["Watson Discovery", "LLM"], index=0)
 
-ANSWER:
-'''
+    # File upload for document retrieval in LLM mode
+    uploaded_file = st.file_uploader("Upload file for RAG", accept_multiple_files=False, type=["pdf", "docx", "txt", "pptx", "csv", "json", "xml", "yaml", "html"])
+    
+    # Sidebar for Model Parameters in LLM mode
+    if mode == "LLM":
+        st.header("Watsonx Model Settings")
+        max_tokens = st.slider("Max Output Tokens", 100, 4000, 600)
+        decoding = st.radio("Decoding Method", ["greedy", "sample"])
+        temperature = st.slider("Temperature", 0.0, 1.0, 0.7)
 
-# Streamlit app UI
-st.title("Watsonx AI & Discovery - RAG Query Answering")
-st.write("Enter a question, and the system will try to answer using IBM Watson Discovery and Watsonx AI.")
+        # Watsonx model generator
+        def get_model(model_type, max_tokens, temperature):
+            generate_params = {
+                GenParams.MAX_NEW_TOKENS: max_tokens,
+                GenParams.DECODING_METHOD: decoding,
+                GenParams.TEMPERATURE: temperature,
+            }
+            model = Model(
+                model_id=model_type,
+                params=generate_params,
+                credentials={"apikey": api_key, "url": url},
+                project_id=watsonx_project_id
+            )
+            return model
 
-# Input: Question
-QUERY = st.text_input("Enter your question:")
+# Main Chat Section
+st.header("Chat with Watsonx AI or Discovery")
 
-if QUERY:
-    # Get passages from Watson Discovery
-    passage_list = discovery.query(
-        project_id=IBM_DISC_PROJ_ID,
-        natural_language_query=QUERY,
-        count=5,
-        collection_ids=[IBM_DISC_COLL_ID],
-        similar={"fields": ["text"]},
-        passages={
-            "enabled": True,
-            "per_document": True,
-            "find_answers": True,
-            "max_answers_per_passage": 1,
-            "characters": 250
-        }
-    ).get_result()['results']
+# Initialize chat history
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-    # Wrap into singular string
-    passage_text = '\n\n'.join(list(map(
-        lambda x: '\n\n'.join(map(lambda p: p['passage_text'], x['document_passages'])),
-        passage_list
-    )))
+# Display chat messages
+for message in st.session_state.history:
+    if message["role"] == "user":
+        st.chat_message(message["role"], avatar="🟦").markdown(message["content"])
+    else:
+        st.chat_message(message["role"], avatar="🟨").markdown(message["content"])
 
-    # Define model parameters
-    model = Model(
-        model_id="meta-llama/llama-3-1-70b-instruct",
-        params={
-            "decoding_method": "greedy",
-            "max_new_tokens": 300,
-            "temperature": 0,
-            "min_new_tokens": 35,
-            "repetition_penalty": 1.1,
-            "stop_sequences": ["\n\n"]
-        },
-        project_id=IBM_WX_PROJ_ID,
-        credentials=ai_credentials
-    )
+# Text input for questions
+prompt = st.chat_input("Ask your question here", disabled=False if mode == "LLM" or mode == "Watson Discovery" else True)
 
-    # Combine passage text and query into final prompt
-    final_prompt = PROMPT_TEMPLATE % (passage_text, QUERY)
+# Button for query submission and generating responses
+if prompt:
+    st.chat_message("user", avatar="🟦").markdown(prompt)
+    st.session_state.history.append({"role": "user", "content": prompt})
 
-    # Get response from the model
-    output = model.generate_text(prompt=final_prompt, guardrails=False)
+    if mode == "LLM":
+        model = get_model(model_type, max_tokens, temperature)
+        prompt_text = f"<s>[INST] <<SYS>> Please answer the question: {prompt}<</SYS>>[/INST]"
+        response = model.generate(prompt_text)
+        response_text = response['results'][0]['generated_text']
 
-    # Display the result
-    st.write("### Answer:")
-    st.write(output)
+    elif mode == "Watson Discovery":
+        query_response = discovery.query(
+            project_id='016da9fc-26f5-464a-a0b8-c9b0b9da83c7',  # project_id from notebook
+            collection_ids=['1d91d603-cd71-5cf5-0000-019325bcd328'],  # collection_id from notebook
+            natural_language_query=prompt,
+            count=1
+        ).get_result()
+        if query_response['results']:
+            response_text = query_response['results'][0]['text']
+        else:
+            response_text = "No relevant documents found."
+
+    st.session_state.history.append({"role": "assistant", "content": response_text})
+    st.chat_message("assistant", avatar="🟨").markdown(response_text)
+
+# Button to clear chat history
+if st.sidebar.button("Clear Messages"):
+    st.session_state.history = []
