@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 from ibm_watson import DiscoveryV2
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
