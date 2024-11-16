@@ -3,6 +3,7 @@ from ibm_watson import DiscoveryV2
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 from ibm_watson_machine_learning.foundation_models import Model
 from ibm_watson_machine_learning.metanames import GenTextParamsMetaNames as GenParams
+from dotenv import load_dotenv
 
 # IBM Watson Discovery Credentials
 authenticator = IAMAuthenticator('5sSmoI6y0ZHP7D3a6Iu80neypsbK3tsUZR_VdRAb7ed2')
@@ -13,8 +14,9 @@ discovery = DiscoveryV2(
 discovery.set_service_url('https://api.us-south.discovery.watson.cloud.ibm.com/instances/62dc0387-6c6f-4128-b479-00cf5dea09ef')
 
 # Watsonx Model Setup
+load_dotenv()
 url = "https://us-south.ml.cloud.ibm.com"
-api_key = "zf-5qgRvW-_RMBGb0bQw5JPPGGj5wdYpLVypdjQxBGJz"
+api_key = os.getenv("API_KEY")
 watsonx_project_id = "32a4b026-a46a-48df-aae3-31e16caabc3b"
 model_type = "meta-llama/llama-3-1-70b-instruct"
 
