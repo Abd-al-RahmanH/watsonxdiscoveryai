@@ -3,3 +3,4 @@ ibm-watson
 ibm-cloud-sdk-core
 ibm-watson-machine-learning
 ibm-watsonx-ai
+python-dotenv
