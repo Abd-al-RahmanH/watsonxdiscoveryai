@@ -14,7 +14,7 @@ discovery = DiscoveryV2(
 )
 discovery.set_service_url('https://api.us-south.discovery.watson.cloud.ibm.com/instances/62dc0387-6c6f-4128-b479-00cf5dea09ef')
 
-# Watsonx Model Setup
+# Watsonx Model Setup.
 load_dotenv()
 url = "https://us-south.ml.cloud.ibm.com"
 api_key = os.getenv("API_KEY")
